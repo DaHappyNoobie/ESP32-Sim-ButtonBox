@@ -1,8 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2022-2024 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: Unlicense OR CC0-1.0
- */
 
 #include <stdlib.h>
 #include "esp_log.h"
@@ -22,8 +17,6 @@ static const char *TAG = "example";
 /**
  * @brief HID report descriptor
  *
- * In this example we implement Keyboard + Mouse HID device,
- * so we must define both report descriptors
  */
 const uint8_t hid_report_descriptor[] = {
     TUD_HID_REPORT_DESC_GAMEPAD()
@@ -36,7 +29,7 @@ const char* hid_string_descriptor[5] = {
     // array of pointer to string descriptors
     (char[]){0x09, 0x04},  // 0: is supported language is English (0x0409)
     "TinyUSB",             // 1: Manufacturer
-    "TinyUSB Device",      // 2: Product
+    "Sim Button Box",      // 2: Product
     "123456",              // 3: Serials, should use chip ID
     "Example HID interface",  // 4: HID
 };
@@ -53,6 +46,11 @@ static const uint8_t hid_configuration_descriptor[] = {
     // Interface number, string index, boot protocol, report descriptor len, EP In address, size & polling interval
     TUD_HID_DESCRIPTOR(0, 4, false, sizeof(hid_report_descriptor), 0x81, 16, 10),
 };
+
+/**
+ * @brief Gamepad report
+ */
+static hid_gamepad_report_t gamepad_report;
 
 /********* TinyUSB HID callbacks ***************/
 
@@ -86,17 +84,40 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
 
 /********* Application ***************/
 
-static void app_send_hid_demo(bool button_state)
+// Copy contents of gamepad report struct.
+static void copy_gamepad_report(hid_gamepad_report_t* source, hid_gamepad_report_t* destination)
+{
+    destination->x = source->x;
+    destination->y = source->y;
+    destination->z = source->z;
+    destination->rz = source->rz;
+    destination->rx = source->rx;
+    destination->ry = source->ry;
+    destination->hat = source->hat;
+    destination->buttons = source->buttons;
+}
+
+// Compare contents of gamepad report struct. Return True if contents differ
+static bool compare_gamepad_report(hid_gamepad_report_t* rep_a, hid_gamepad_report_t* rep_b)
+{
+    uint8_t count = 0;
+    count += rep_a->x != rep_b->x;
+    count += rep_a->y != rep_b->y;
+    count += rep_a->z != rep_b->z;
+    count += rep_a->rz != rep_b->rz;
+    count += rep_a->rx != rep_b->rx;
+    count += rep_a->ry != rep_b->ry;
+    count += rep_a->hat != rep_b->hat;
+    count += rep_a->buttons != rep_b->buttons;
+    if(count > 0) return true;
+    else return false;
+}
+
+static void app_send_hid_demo(hid_gamepad_report_t report)
 {
     // Gamepad output
-    ESP_LOGI(TAG, "Sending Keyboard report");
-    uint32_t btnMask = 0;
-    if(button_state){
-        btnMask = GAMEPAD_BUTTON_0;
-    } else {
-        btnMask = 0;
-    }
-    tud_hid_gamepad_report(HID_ITF_PROTOCOL_NONE, 0, 0, 0, 0, 0, 0, 0, btnMask);
+    ESP_LOGI(TAG, "Sending Gamepad report");
+    tud_hid_report(0, &report, sizeof(report));
     vTaskDelay(pdMS_TO_TICKS(1));
 }
 
@@ -130,16 +151,30 @@ void app_main(void)
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
     ESP_LOGI(TAG, "USB initialization DONE");
 
-    static bool button_state = true;
-    static bool prev_button_state = true;
+    // Initialize gamepad state to all 0
+    gamepad_report.x = 0;
+    gamepad_report.y = 0;
+    gamepad_report.z = 0;
+    gamepad_report.rz = 0;
+    gamepad_report.rx = 0;
+    gamepad_report.ry = 0;
+    gamepad_report.hat = 0;
+    gamepad_report.buttons = 0;
+
+    static hid_gamepad_report_t prevgamepad_report;
+    copy_gamepad_report(&gamepad_report, &prevgamepad_report);
 
     while (1) {
         if (tud_mounted()) {
-            if (button_state != prev_button_state) {
-                prev_button_state = button_state;
-                app_send_hid_demo(button_state);
+            if(compare_gamepad_report(&gamepad_report, &prevgamepad_report)) {
+                copy_gamepad_report(&gamepad_report, &prevgamepad_report);
+                app_send_hid_demo(gamepad_report);
             }
-            button_state = !gpio_get_level(APP_BUTTON);
+            if(!gpio_get_level(APP_BUTTON)){
+                gamepad_report.buttons = GAMEPAD_BUTTON_0;
+            } else {
+                gamepad_report.buttons = 0;
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(1));
     }
