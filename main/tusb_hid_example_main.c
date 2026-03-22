@@ -6,8 +6,34 @@
 #include "tinyusb.h"
 #include "class/hid/hid_device.h"
 #include "driver/gpio.h"
+#include <pcf8575.h>
 
-#define APP_BUTTON (GPIO_NUM_0) // Use BOOT signal by default
+#define PIN_I2C_SDA (GPIO_NUM_7)
+#define PIN_I2C_SCL (GPIO_NUM_8)
+#define PIN_I2C_INT (GPIO_NUM_9)
+#define I2C_ADDR 0x20 //7-bit addr, TODO check if correct
+
+#define MOMENTARY_1A  (GPIO_NUM_1)
+#define MOMENTARY_1B  (GPIO_NUM_2)
+#define MOMENTARY_2A  (GPIO_NUM_42)
+#define MOMENTARY_2B  (GPIO_NUM_41)
+#define MOMENTARY_3A  (GPIO_NUM_40)
+#define MOMENTARY_3B  (GPIO_NUM_39)
+#define MOMENTARY_4A  (GPIO_NUM_48)
+#define MOMENTARY_4B  (GPIO_NUM_47)
+#define MOMENTARY_5A  (GPIO_NUM_21)
+#define MOMENTARY_5B  (GPIO_NUM_14)
+#define MOMENTARY_6A  (GPIO_NUM_13)
+#define MOMENTARY_6B  (GPIO_NUM_12)
+#define MOMENTARY_7A  (GPIO_NUM_11)
+#define MOMENTARY_7B  (GPIO_NUM_10)
+#define MOMENTARY_8A  (GPIO_NUM_18)
+#define MOMENTARY_8B  (GPIO_NUM_17)
+#define MOMENTARY_9A  (GPIO_NUM_16)
+#define MOMENTARY_9B  (GPIO_NUM_15)
+
+#define GPIO_INPUT_MASK ((1ULL<<MOMENTARY_1A)|(1ULL<<MOMENTARY_1B)|(1ULL<<MOMENTARY_2A)|(1ULL<<MOMENTARY_2B)|(1ULL<<MOMENTARY_3A)|(1ULL<<MOMENTARY_3B)|(1ULL<<MOMENTARY_4A)|(1ULL<<MOMENTARY_4B)|(1ULL<<MOMENTARY_5A)|(1ULL<<MOMENTARY_5B)|(1ULL<<MOMENTARY_6A)|(1ULL<<MOMENTARY_6B)|(1ULL<<MOMENTARY_7A)|(1ULL<<MOMENTARY_7B)|(1ULL<<MOMENTARY_8A)|(1ULL<<MOMENTARY_8B)|(1ULL<<MOMENTARY_9A)|(1ULL<<MOMENTARY_9B))
+
 static const char *TAG = "example";
 
 /************* TinyUSB descriptors ****************/
@@ -123,15 +149,23 @@ static void app_send_hid_demo(hid_gamepad_report_t report)
 
 void app_main(void)
 {
-    // Initialize button that will trigger HID reports
-    const gpio_config_t boot_button_config = {
-        .pin_bit_mask = BIT64(APP_BUTTON),
+    // Initialize buttons
+    const gpio_config_t button_config = {
+        //.pin_bit_mask = BIT64(MOMENTARY_1A|MOMENTARY_1B|MOMENTARY_2A|MOMENTARY_2B|MOMENTARY_3A),
+        .pin_bit_mask = GPIO_INPUT_MASK,
         .mode = GPIO_MODE_INPUT,
         .intr_type = GPIO_INTR_DISABLE,
-        .pull_up_en = true,
+        .pull_up_en = false,
         .pull_down_en = false,
     };
-    ESP_ERROR_CHECK(gpio_config(&boot_button_config));
+    ESP_ERROR_CHECK(gpio_config(&button_config));
+
+    // Initialize IO expander
+    ESP_ERROR_CHECK(i2cdev_init());
+    i2c_dev_t pcf8575;
+    memset(&pcf8575, 0, sizeof(i2c_dev_t));
+    ESP_ERROR_CHECK(pcf8575_init_desc(&pcf8575, I2C_ADDR, 0, PIN_I2C_SDA, PIN_I2C_SCL));
+    uint16_t gpioExpanderPortVal = 0xFFFF;
 
     ESP_LOGI(TAG, "USB initialization");
     const tinyusb_config_t tusb_cfg = {
@@ -170,12 +204,52 @@ void app_main(void)
                 copy_gamepad_report(&gamepad_report, &prevgamepad_report);
                 app_send_hid_demo(gamepad_report);
             }
-            if(!gpio_get_level(APP_BUTTON)){
-                gamepad_report.buttons = GAMEPAD_BUTTON_0;
-            } else {
-                gamepad_report.buttons = 0;
+            gamepad_report.buttons = 0;
+            if(!gpio_get_level(MOMENTARY_1A)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_0;
+            } if(!gpio_get_level(MOMENTARY_1B)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_1;
+            } if(!gpio_get_level(MOMENTARY_2A)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_2;
+            } if(!gpio_get_level(MOMENTARY_2B)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_3;
+            } if(!gpio_get_level(MOMENTARY_3A)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_4;
+            } if(!gpio_get_level(MOMENTARY_3B)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_5;
+            } if(!gpio_get_level(MOMENTARY_4A)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_6;
+            } if(!gpio_get_level(MOMENTARY_4B)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_7;
+            } if(!gpio_get_level(MOMENTARY_5A)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_8;
+            } if(!gpio_get_level(MOMENTARY_5B)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_9;
+            } if(!gpio_get_level(MOMENTARY_6A)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_10;
+            } if(!gpio_get_level(MOMENTARY_6B)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_11;
+            } if(!gpio_get_level(MOMENTARY_7A)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_12;
+            } if(!gpio_get_level(MOMENTARY_7B)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_13;
+            } if(!gpio_get_level(MOMENTARY_8A)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_14;
+            } if(!gpio_get_level(MOMENTARY_8B)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_15;
+            } if(!gpio_get_level(MOMENTARY_9A)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_16;
+            } if(!gpio_get_level(MOMENTARY_9B)){
+                gamepad_report.buttons += GAMEPAD_BUTTON_17;
             }
+            
+            ////
+            // Poll GPIO Expander
+            pcf8575_port_read(&pcf8575, &gpioExpanderPortVal);
+            ESP_LOGI("IOEXP","Port read : %d", gpioExpanderPortVal);
+            gamepad_report.buttons += (((uint32_t)gpioExpanderPortVal & 0x000000FF) << 24);
+            ////
         }
-        vTaskDelay(pdMS_TO_TICKS(1));
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
