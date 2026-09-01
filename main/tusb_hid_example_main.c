@@ -1,4 +1,11 @@
-
+////////
+//  ESP32 Sim Buttonbox - by DaHappyNoobie
+//  Based on the tinyUSB USB HID example code from ESP-IDF.
+//  This code instantiates a USB-HID gamepad profile from the TinyUSB stack, so that the ESP32-S3 shows up as a driverless game controller on PC.
+//  GPIOs are used both directly on-chip as well as through a I²C GPIO expander for additional inputs.
+//  Everything is handled as a simple sequential loop, as the use case here doesn't need high speed input reading and reporting.
+//  Interrupt line of the GPIO expander is wired in, so interrupt capability can be added in firmware if needed.
+////////
 #include <stdlib.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -8,11 +15,12 @@
 #include "driver/gpio.h"
 #include <pcf8575.h>
 
+// I²C lines for GPIO Expander
 #define PIN_I2C_SDA (GPIO_NUM_7)
 #define PIN_I2C_SCL (GPIO_NUM_8)
 #define PIN_I2C_INT (GPIO_NUM_9)
-#define I2C_ADDR 0x20 //7-bit addr, TODO check if correct
-
+#define I2C_ADDR 0x20 //7-bit address of GPIO Expander
+// MCU inputs
 #define MOMENTARY_1A  (GPIO_NUM_1)
 #define MOMENTARY_1B  (GPIO_NUM_2)
 #define MOMENTARY_2A  (GPIO_NUM_42)
@@ -124,7 +132,7 @@ static void copy_gamepad_report(hid_gamepad_report_t* source, hid_gamepad_report
     destination->buttons = source->buttons;
 }
 
-// Compare contents of gamepad report struct. Return True if contents differ
+// Compare contents of gamepad report struct. Return True if contents differ, so we don't send the same report repeatedly
 static bool compare_gamepad_report(hid_gamepad_report_t* rep_a, hid_gamepad_report_t* rep_b)
 {
     uint8_t count = 0;
@@ -152,10 +160,10 @@ void app_main(void)
 {
     // Initialize buttons
     const gpio_config_t button_config = {
-        //.pin_bit_mask = BIT64(MOMENTARY_1A|MOMENTARY_1B|MOMENTARY_2A|MOMENTARY_2B|MOMENTARY_3A),
         .pin_bit_mask = GPIO_INPUT_MASK,
         .mode = GPIO_MODE_INPUT,
         .intr_type = GPIO_INTR_DISABLE,
+        // Pullups are external, so no need to enable the internal ones
         .pull_up_en = false,
         .pull_down_en = false,
     };
@@ -195,16 +203,18 @@ void app_main(void)
     gamepad_report.ry = 0;
     gamepad_report.hat = 0;
     gamepad_report.buttons = 0;
-
     static hid_gamepad_report_t prevgamepad_report;
     copy_gamepad_report(&gamepad_report, &prevgamepad_report);
 
+    // Main program loop
     while (1) {
         if (tud_mounted()) {
+            // If the new report differs form the previous one, send it through USB.
             if(compare_gamepad_report(&gamepad_report, &prevgamepad_report)) {
                 copy_gamepad_report(&gamepad_report, &prevgamepad_report);
                 app_send_hid_demo(gamepad_report);
             }
+            // Get IO states and build report
             gamepad_report.buttons = 0;
             if(!gpio_get_level(MOMENTARY_1A)){
                 gamepad_report.buttons += GAMEPAD_BUTTON_0;
@@ -245,14 +255,12 @@ void app_main(void)
             } if(!gpio_get_level(PUSHBUTTON)){
                 gamepad_report.buttons += GAMEPAD_BUTTON_18;
             }
-            
-            ////
-            // Poll GPIO Expander
+            // Poll GPIO Expander and complete report
             pcf8575_port_read(&pcf8575, &gpioExpanderPortVal);
             ESP_LOGI("IOEXP","Port read : %d", gpioExpanderPortVal);
             gamepad_report.buttons += (((uint32_t)gpioExpanderPortVal & 0x000000FF) << 24);
-            ////
         }
+        // Some dead time to allow other OS tasks to run, like the USB stack
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
