@@ -1,80 +1,34 @@
-| Supported Targets | ESP32-P4 | ESP32-S2 | ESP32-S3 |
-| ----------------- | -------- | -------- | -------- |
+## ESP32 Sim Buttonbox
+I got into flying IL-2 Great Battles pretty recently, and found myself needing a lot of buttons for control surfaces trimming, engine controls, radiators, etc...
+Not enough buttons on my stick and throttle, and using keyboard is annoying! I need a button box! Good opportunity for a small personal project and learning a bit about building devices in an enclosure like this.
+Time to make a simple but usable USB button box.
 
-# TinyUSB Human Interface Device Example
+![Picture of the box](buttonbox.png)
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+## What it does
+This box exposes 9 bidirectional momentary switches, 8 toggle switches, and a button (27 GPIOs total). It uses an ESP32-S3 microcontroller implementing the TinyUSB stack with HID gamepad profile. This allows the box to be plug-and-play into any USB host, without the need for drivers. The circuit board and firmware are intended to be either reused as-is in other configurations, or expanded upon for more complex button boxes.
 
-Human interface devices (HID) are one of the most common USB devices, it is implemented in various devices such as keyboards, mice, game controllers, sensors and alphanumeric display devices.
-In this example, we implement USB keyboard and mouse.
-Upon connection to USB host (PC), the example application will sent 'key a/A pressed & released' events and move mouse in a square trajectory. To send these HID reports again, press the BOOT button, that is present on most ESP development boards (GPIO0).
+## Firmware
+Written using ESP-IDF v5.5.1 framework. Install that either independently or through the VSCode extension, build,, flash, restart the board, and the USB controller should pop up in your PC's peripherals, ready to use.
+The firmware itself is simple, derived from the TinyUSb HID example in ESP-IDF. A simple polling loop handles reading all the inputs, then building and sending a HID report through USB. Provisions are made in hardware to use the I/Os in Interrupt mode instead of polling (even through the I²C GPIO expander), but it's not really needed for my current use.
+Keep the small Boot button pressed on the board while plugging the USB in to boot up in firmware download mode and reprogram the board if needed.
 
-As a USB stack, a TinyUSB component is used.
+## Hardware
+I designed a small 2-layer PCB implementing everything that's needed for a generic button box controller. Hook up your buttons and switches to the screw terminals on the board and start building.
+The USB-B receptacle sticks out the back of the PCB, as it is intended to be mounted against the rear face of the enclosure.
+I used a Hammond 1456CE3BKBU aluminium enclosure to build this project. It's relatively cheap, easy to work on, and has the perfect form factor for my space-constrained requirements.
 
-## How to use example
+![Bare enclosure](enclosure.png)
+![PCB mount](pcbmount.png)
 
-### Hardware Required
+MECHANICAL_ASSEMBLY folder contains 3D models in.step format for the following elements :
+- Bare enclosure as sold
+- Enclosure with the necessary drill holes for buttons, switches and mounting
+- Controller circuit board
+- Fully assembled button box (with all independent parts embedded in the file)
 
-Any ESP board that have USB-OTG supported.
-
-#### Pin Assignment
-
-_Note:_ In case your board doesn't have micro-USB connector connected to USB-OTG peripheral, you may have to DIY a cable and connect **D+** and **D-** to the pins listed below.
-
-See common pin assignments for USB Device examples from [upper level](../../README.md#common-pin-assignments).
-
-Boot signal (GPIO0) is used to send HID reports to USB host.
-
-### Build and Flash
-
-Build the project and flash it to the board, then run monitor tool to view serial output:
-
-```bash
-idf.py -p PORT flash monitor
-```
-
-(Replace PORT with the name of the serial port to use.)
-
-(To exit the serial monitor, type ``Ctrl-]``.)
-
-See the Getting Started Guide for full steps to configure and use ESP-IDF to build projects.
-
-## Example Output
-
-After the flashing you should see the output at idf monitor:
-
-```
-I (290) cpu_start: Starting scheduler on PRO CPU.
-I (0) cpu_start: Starting scheduler on APP CPU.
-I (310) example: USB initialization
-I (310) tusb_desc:
-┌─────────────────────────────────┐
-│  USB Device Descriptor Summary  │
-├───────────────────┬─────────────┤
-│bDeviceClass       │ 0           │
-├───────────────────┼─────────────┤
-│bDeviceSubClass    │ 0           │
-├───────────────────┼─────────────┤
-│bDeviceProtocol    │ 0           │
-├───────────────────┼─────────────┤
-│bMaxPacketSize0    │ 64          │
-├───────────────────┼─────────────┤
-│idVendor           │ 0x303a      │
-├───────────────────┼─────────────┤
-│idProduct          │ 0x4004      │
-├───────────────────┼─────────────┤
-│bcdDevice          │ 0x100       │
-├───────────────────┼─────────────┤
-│iManufacturer      │ 0x1         │
-├───────────────────┼─────────────┤
-│iProduct           │ 0x2         │
-├───────────────────┼─────────────┤
-│iSerialNumber      │ 0x3         │
-├───────────────────┼─────────────┤
-│bNumConfigurations │ 0x1         │
-└───────────────────┴─────────────┘
-I (480) TinyUSB: TinyUSB Driver installed
-I (480) example: USB initialization DONE
-I (2490) example: Sending Keyboard report
-I (3040) example: Sending Mouse report
-```
+PCB_ESP32_SimButtonBox folder contains the circuit board design files :
+- Parts BOM
+- Autodesk EAGLE CAD files in .sch and .brd formats. Since EAGLE is now discontinued, you should be able to import them in Fusion360 Electronics with no issue. KiCAD should work too!
+- Schematic in PDF format
+- Gerber files for manufacturing the PCBs. I recommend getting a small solder stencil according to the Gerbers for easier reflow soldering.
