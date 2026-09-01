@@ -1,0 +1,38 @@
+List of button box inputs
+-------------------------
+
+Total : 
+9 Momentary switches
+8 Toggle switches
+1 Buttons
+-----> If using 9 momentaries, 8 toggles, 1 button -> 27 GPIOs
+-----> At least 1 GPIO Expander (16bit) should be used
+
+TRIMMING
+--------
+Elevator Trim / Stabilizer +/- -> Momentary switch
+Aileron Trim +/- -> Momentary switch
+Rudder Trim +/- -> Momentary switch
+
+ENGINE CONTROL
+--------------
+Engine Select 1 On/Off -> Toggle switch (small)
+Engine Select 2 On/Off -> Toggle switch (small)
+Propeller Pitch / RPM +/- -> Momentary switch
+Fuel Mixture +/- -> Momentary switch
+Oil Radiator +/- -> Momentary switch
+Water Radiator / Inlet cowl +/- -> Momentary switch
+Outlet cowl +/- -> Momentary switch
+Supercharger Gear +/- -> Momentary switch
+Engine Ignition -> Button
+
+GEAR AND LIGHTS
+---------------
+Landing Gear Up/Down -> Toggle switch
+Tail Wheel Lock/Unlock -> Toggle switch
+Landing Lights toggle -> Toggle switch
+Formation Lights toggle -> Toggle switch
+
+MISC
+----
+Bomber autopilot/autolevel -> Toggle switch
